@@ -29,8 +29,6 @@ python3 test_system.py
 ```
 Runs comprehensive tests including functionality checks.
 
-See [TESTING.md](TESTING.md) for detailed testing guide.
-
 ## Quick Start
 
 1. Generate fake data:
@@ -145,15 +143,4 @@ For production, consider:
 - **Implicit** - Fast collaborative filtering
 - **LightFM** - Hybrid recommendation library
 
-## Next Steps
-
-1. Add more sophisticated features (time of day, location, weather)
-2. Implement hybrid models combining multiple approaches
-3. Add evaluation metrics (precision@k, recall@k, NDCG)
-4. Deploy as a REST API
-5. Add real-time inference capabilities
-
-## License
-
-MIT
 
