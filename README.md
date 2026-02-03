@@ -48,30 +48,240 @@ pip3 install -r requirements.txt --break-system-packages
 
 ## Testing
 
-### Quick Validation (No Dependencies)
+### Quick Start (3 Steps)
+
+#### Step 1: Quick Validation (No Installation Needed)
 ```bash
 python3 test_quick.py
 ```
 Validates code structure and syntax without requiring dependencies.
 
-### Full Testing (Requires Dependencies)
+#### Step 2: Setup Virtual Environment and Install Dependencies
+
+**On macOS (Python 3.13+), you need a virtual environment:**
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate it
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+**Or use the setup script:**
+```bash
+./setup_venv.sh
+```
+
+**Note:** Always activate the virtual environment before running tests:
+```bash
+source venv/bin/activate
+```
+
+#### Step 3: Run Full Tests
 ```bash
 python3 test_system.py
 ```
-Runs comprehensive tests including:
-- Data generation with two user types (new users vs long-standing members)
-- Missing data handling
-- Feature engineering with incomplete data
-- Model compatibility with both user types
+Tests all functionality including new data models
 
-### Automated Test Runner
+---
+
+### Testing Options
+
+#### Option A: Automated Test Runner (Recommended)
 ```bash
 python3 run_tests.py
 ```
-Runs all tests in sequence and optionally generates data and runs demo.
+Runs everything automatically:
+- Checks dependencies
+- Validates code structure
+- Tests functionality
+- Generates test data
+- Optionally runs demo
 
-### Testing Guide
-See [TESTING.md](TESTING.md) for detailed testing instructions, manual testing examples, and troubleshooting.
+#### Option B: Manual Step-by-Step
+
+1. **Quick syntax check:**
+   ```bash
+   python3 test_quick.py
+   ```
+
+2. **Generate test data:**
+   ```bash
+   python3 data_generator.py
+   ```
+   Creates:
+   - `data/user_profiles.csv` (new users + long-standing members)
+   - `data/activity_sequences.csv`
+   - `data/interaction_matrix.csv`
+
+3. **Run full test suite:**
+   ```bash
+   python3 test_system.py
+   ```
+
+4. **Run demo (optional):**
+   ```bash
+   python3 demo.py
+   ```
+
+#### Option C: Complete Setup and Test
+```bash
+./setup_and_test.sh
+```
+Automated script that sets up virtual environment, installs dependencies, runs all tests, generates data, and optionally runs the demo.
+
+---
+
+### What Gets Tested
+
+#### Data Generation
+- Creates two user types (new users vs long-standing members)
+- New users have skeletal data (age, weight, optional height)
+- New users have missing metadata
+- Long-standing members have robust metadata
+- Activity distribution matches user types
+
+#### Feature Engineering
+- Handles missing data gracefully
+- Imputes missing values
+- Works with users who have no activities
+- Creates features for both user types
+
+#### Models
+- Two Towers model works with minimal data (age, weight)
+- Two Towers model works with full data (age, weight, height)
+- Recommendations work for both user types
+- Handles missing values automatically
+
+---
+
+### 🔍 Verify Test Results
+
+#### Quick Test Should Show:
+```
+All files have valid Python syntax
+All expected classes found
+All expected functions found
+CODE STRUCTURE VALIDATED
+```
+
+#### Full Test Should Show:
+```
+All dependencies installed
+Code structure OK
+Code syntax OK
+Basic functionality works
+ALL TESTS PASSED - System ready to use!
+```
+
+---
+
+### Troubleshooting
+
+**"ModuleNotFoundError"**
+→ Make sure virtual environment is activated and dependencies are installed:
+  ```bash
+  source venv/bin/activate
+  pip install -r requirements.txt
+  ```
+
+**"externally-managed-environment" error**
+→ Use a virtual environment (see Step 2 above)
+
+**"FileNotFoundError: data/user_profiles.csv"**
+→ Generate data first:
+  ```bash
+  python3 data_generator.py
+  ```
+
+**"ValueError: Input contains NaN"**
+→ Make sure to use `handle_missing=True` in feature engineering (already done in tests)
+
+**"Empty activity sequences"**
+→ This is expected for new users. The system handles this:
+  ```python
+  # Activity features will have zeros for users with no activities
+  activity_features = fe.create_activity_features(activity_sequences, user_profiles)
+  ```
+
+---
+
+### Manual Testing Examples
+
+#### Test Data Generation
+```python
+import pandas as pd
+
+# Check user types
+profiles = pd.read_csv('data/user_profiles.csv')
+print(f"New users: {len(profiles[profiles['membership_type'] == 'new_user'])}")
+print(f"Long-standing: {len(profiles[profiles['membership_type'] == 'long_standing'])}")
+
+# Check new users have missing data
+new_users = profiles[profiles['membership_type'] == 'new_user']
+print(f"New users with missing metadata: {new_users['membership_duration_days'].isna().sum()}")
+```
+
+#### Test Feature Engineering
+```python
+from feature_engineering import FeatureEngineer
+import pandas as pd
+
+# Load data
+user_profiles = pd.read_csv('data/user_profiles.csv')
+activity_sequences = pd.read_csv('data/activity_sequences.csv')
+
+# Create feature engineer
+fe = FeatureEngineer()
+
+# Test with missing data
+user_features = fe.create_user_features(user_profiles, handle_missing=True)
+print(f"Created {len(user_features.columns)} features")
+print(f"Handled missing values: {user_features.isna().sum().sum() == 0}")
+
+# Test activity features (handles users with no activities)
+activity_features = fe.create_activity_features(activity_sequences, user_profiles)
+print(f"Activity features for all users: {len(activity_features) == len(user_profiles)}")
+```
+
+#### Test Models with Both User Types
+```python
+from models.two_towers import TwoTowerModel, TwoTowerTrainer
+import pandas as pd
+
+# Load data
+user_profiles = pd.read_csv('data/user_profiles.csv')
+interaction_matrix = pd.read_csv('data/interaction_matrix.csv')
+
+# Prepare activity mapping
+activities = sorted(interaction_matrix['activity'].unique())
+activity_to_idx = {act: idx for idx, act in enumerate(activities)}
+
+# Create model
+model = TwoTowerModel(user_feature_dim=3, num_activities=len(activities), embedding_dim=64)
+trainer = TwoTowerTrainer(model)
+
+# Prepare data (handles missing values)
+user_features, activity_indices, labels = trainer.prepare_data(
+    user_profiles, 
+    interaction_matrix, 
+    activity_to_idx,
+    use_feature_engineering=True
+)
+
+# Test recommendation for new user (minimal data)
+new_user = user_profiles[user_profiles['membership_type'] == 'new_user'].iloc[0]
+recs = trainer.recommend(
+    [new_user['age'], new_user['weight_kg']],  # Only age and weight
+    activity_to_idx,
+    top_k=5
+)
+print(f"Recommendations for new user: {recs}")
+```
 
 ## Quick Start
 
