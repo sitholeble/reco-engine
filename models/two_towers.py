@@ -83,34 +83,75 @@ class TwoTowerTrainer:
         self.device = device
         self.scaler = StandardScaler()
         
-    def prepare_data(self, user_profiles, interaction_matrix, activity_to_idx):
+    def prepare_data(self, user_profiles, interaction_matrix, activity_to_idx, 
+                    use_feature_engineering=True, feature_engineer=None):
         """
         Prepare data for training.
+        Handles both new users (skeletal data) and long-standing members (robust data).
         
         Args:
-            user_profiles: DataFrame with user features
+            user_profiles: DataFrame with user features (may have missing values)
             interaction_matrix: DataFrame with user_id, activity, count/rating
             activity_to_idx: Mapping from activity name to index
+            use_feature_engineering: Whether to use FeatureEngineer for handling missing data
+            feature_engineer: Optional FeatureEngineer instance (creates new if None)
         """
+        import pandas as pd
+        import numpy as np
+        
         # Merge user profiles with interactions
+        # Use minimal features that are always available
+        base_cols = ['user_id', 'age', 'weight_kg']
+        if 'height_cm' in user_profiles.columns:
+            base_cols.append('height_cm')
+        
         data = interaction_matrix.merge(
-            user_profiles[['user_id', 'age', 'weight_kg', 'height_cm']],
+            user_profiles[base_cols],
             on='user_id',
             how='left'
         )
         
+        # Handle missing values
+        if use_feature_engineering:
+            if feature_engineer is None:
+                from feature_engineering import FeatureEngineer
+                feature_engineer = FeatureEngineer()
+            
+            # Impute missing values
+            for col in base_cols:
+                if col != 'user_id' and data[col].isna().any():
+                    if col == 'height_cm':
+                        # Use mean height for missing values
+                        fill_value = data[col].mean() if data[col].notna().any() else 170
+                    elif col == 'age':
+                        fill_value = data[col].mean() if data[col].notna().any() else 35
+                    elif col == 'weight_kg':
+                        fill_value = data[col].mean() if data[col].notna().any() else 70
+                    else:
+                        fill_value = 0
+                    data[col] = data[col].fillna(fill_value)
+        else:
+            # Simple imputation
+            data['height_cm'] = data['height_cm'].fillna(data['height_cm'].mean() if data['height_cm'].notna().any() else 170)
+            data['age'] = data['age'].fillna(data['age'].mean() if data['age'].notna().any() else 35)
+            data['weight_kg'] = data['weight_kg'].fillna(data['weight_kg'].mean() if data['weight_kg'].notna().any() else 70)
+        
         # Create activity indices
         data['activity_idx'] = data['activity'].map(activity_to_idx)
+        data = data.dropna(subset=['activity_idx'])  # Remove any unmapped activities
         
-        # Prepare features
-        user_features = data[['age', 'weight_kg', 'height_cm']].values
+        # Prepare features (use only available columns)
+        feature_cols = [col for col in ['age', 'weight_kg', 'height_cm'] if col in data.columns]
+        user_features = data[feature_cols].values
+        
+        # Scale features
         user_features = self.scaler.fit_transform(user_features)
         
         activity_indices = data['activity_idx'].values
         labels = data['count' if 'count' in data.columns else 'avg_rating'].values
         
         # Normalize labels to [0, 1] for binary cross-entropy or use as-is for MSE
-        if labels.max() > 1:
+        if len(labels) > 0 and labels.max() > 1:
             labels = labels / labels.max()
         
         return user_features, activity_indices, labels
@@ -183,9 +224,11 @@ class TwoTowerTrainer:
     def recommend(self, user_features, activity_to_idx, top_k=5, exclude_activities=None):
         """
         Recommend activities for a user.
+        Handles both complete and incomplete user features.
         
         Args:
-            user_features: Array of shape (user_feature_dim,) - [age, weight, height]
+            user_features: Array of shape (user_feature_dim,) - [age, weight, height] or dict/list
+                          Can be minimal (age, weight) or full (age, weight, height)
             activity_to_idx: Mapping from activity name to index
             top_k: Number of recommendations
             exclude_activities: Set of activity names to exclude
@@ -193,7 +236,30 @@ class TwoTowerTrainer:
         Returns:
             List of tuples (activity, score)
         """
+        import numpy as np
+        
         self.model.eval()
+        
+        # Handle different input formats
+        if isinstance(user_features, dict):
+            # Extract features from dict
+            feature_list = []
+            for col in ['age', 'weight_kg', 'height_cm']:
+                if col in user_features:
+                    feature_list.append(user_features[col])
+                elif col == 'height_cm':
+                    # Use default height if missing
+                    feature_list.append(170)  # Default height
+                else:
+                    feature_list.append(0)
+            user_features = np.array(feature_list)
+        elif isinstance(user_features, list):
+            user_features = np.array(user_features)
+        
+        # Ensure we have the right number of features
+        # If we only have age and weight, pad with default height
+        if len(user_features) == 2:
+            user_features = np.append(user_features, 170)  # Default height
         
         # Normalize user features
         user_features = self.scaler.transform([user_features])

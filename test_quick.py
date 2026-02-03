@@ -94,6 +94,13 @@ def check_functions():
             'generate_activity_sequences',
             'generate_interaction_matrix'
         ],
+        'feature_engineering.py': [
+            'impute_missing_values',
+            'create_user_features',
+            'create_activity_features',
+            'prepare_model_features',
+            'get_minimal_features'
+        ],
     }
     
     all_found = True

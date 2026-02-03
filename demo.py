@@ -193,15 +193,32 @@ def demo_feature_engineering():
     print("\n1. Engineered User Features:")
     user_features = fe.create_user_features(user_profiles)
     print(f"   Original features: {list(user_profiles.columns)}")
-    print(f"   New features added: BMI, age_group, bmi_category, one-hot encodings")
+    print(f"   New features added: BMI, age_group (one-hot), bmi_category (one-hot), one-hot encodings")
     print(f"   Total features: {len(user_features.columns)}")
     print("\n   Sample engineered features:")
-    print(user_features[['user_id', 'age', 'bmi', 'age_group', 'bmi_category']].head())
+    # Show columns that actually exist (age_group and bmi_category are one-hot encoded)
+    display_cols = ['user_id', 'age', 'weight_kg']
+    if 'bmi' in user_features.columns:
+        display_cols.append('bmi')
+    if 'height_cm' in user_features.columns:
+        display_cols.append('height_cm')
+    # Add some one-hot encoded columns if they exist
+    age_group_cols = [col for col in user_features.columns if col.startswith('age_group_')]
+    bmi_cat_cols = [col for col in user_features.columns if col.startswith('bmi_category_')]
+    if age_group_cols:
+        display_cols.append(age_group_cols[0])
+    if bmi_cat_cols:
+        display_cols.append(bmi_cat_cols[0])
+    
+    # Only show columns that exist
+    display_cols = [col for col in display_cols if col in user_features.columns]
+    print(user_features[display_cols].head())
     
     # Activity features
     print("\n2. Engineered Activity Features:")
-    activity_features = fe.create_activity_features(activity_sequences)
+    activity_features = fe.create_activity_features(activity_sequences, user_profiles)
     print(f"   Features created: total_activities, avg_duration, activity_diversity, activity_trend, etc.")
+    print(f"   Features for all users (including those with no activities): {len(activity_features)}")
     print("\n   Sample activity features:")
     print(activity_features.head())
     
