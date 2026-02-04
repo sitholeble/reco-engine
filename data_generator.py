@@ -17,6 +17,24 @@ ACTIVITIES = [
     'hiit', 'stretching', 'walking', 'tennis', 'basketball'
 ]
 
+# Activity classes/categories
+ACTIVITY_CLASSES = {
+    'cardio': ['spin_class', 'cycling', 'running', 'hiit', 'swimming', 'walking', 'dance'],
+    'strength': ['weight_training', 'crossfit', 'boxing'],
+    'flexibility': ['yoga', 'pilates', 'stretching'],
+    'sports': ['tennis', 'basketball']
+}
+
+# Reverse mapping: activity -> class
+ACTIVITY_TO_CLASS = {}
+for activity_class, activities in ACTIVITY_CLASSES.items():
+    for activity in activities:
+        ACTIVITY_TO_CLASS[activity] = activity_class
+
+def get_cardio_activities():
+    """Get list of cardio activities."""
+    return ACTIVITY_CLASSES.get('cardio', [])
+
 # Fitness goals
 FITNESS_GOALS = [
     'weight_loss', 'muscle_gain', 'endurance', 'flexibility', 
@@ -29,7 +47,7 @@ TIME_PREFERENCES = ['morning', 'afternoon', 'evening', 'flexible']
 # Equipment preferences
 EQUIPMENT_PREFERENCES = ['minimal', 'full_gym', 'cardio_focused', 'weights_focused', 'mixed']
 
-def generate_user_profiles(n_users=1000, new_user_ratio=0.3):
+def generate_user_profiles(n_users=1000, new_user_ratio=0.3, seed=42):
     """
     Generate fake user profiles with two types:
     - Long-standing members: robust data with full metadata
@@ -38,12 +56,13 @@ def generate_user_profiles(n_users=1000, new_user_ratio=0.3):
     Args:
         n_users: Total number of users to generate
         new_user_ratio: Proportion of users that are new (default 0.3 = 30%)
+        seed: Random seed for reproducibility (default 42)
     
     Returns:
         DataFrame with user profiles
     """
-    np.random.seed(42)
-    random.seed(42)
+    np.random.seed(seed)
+    random.seed(seed)
     
     n_new_users = int(n_users * new_user_ratio)
     n_long_standing = n_users - n_new_users
@@ -131,7 +150,7 @@ def generate_user_profiles(n_users=1000, new_user_ratio=0.3):
     return df
 
 def generate_activity_sequences(user_profiles, min_activities_new=0, max_activities_new=3, 
-                                min_activities_long=10, max_activities_long=100):
+                                min_activities_long=10, max_activities_long=100, seed=42):
     """
     Generate activity sequences for users.
     New users have few/no activities, long-standing members have many.
@@ -142,9 +161,10 @@ def generate_activity_sequences(user_profiles, min_activities_new=0, max_activit
         max_activities_new: Maximum activities for new users
         min_activities_long: Minimum activities for long-standing members
         max_activities_long: Maximum activities for long-standing members
+        seed: Random seed for reproducibility (default 42)
     """
-    np.random.seed(42)
-    random.seed(42)
+    np.random.seed(seed)
+    random.seed(seed)
     
     sequences = []
     
@@ -219,9 +239,13 @@ def generate_activity_sequences(user_profiles, min_activities_new=0, max_activit
             else:
                 rating = np.random.choice([1, 2, 3, 4, 5], p=[0.1, 0.15, 0.25, 0.3, 0.2])
             
+            # Get activity class
+            activity_class = ACTIVITY_TO_CLASS.get(activity, 'other')
+            
             sequences.append({
                 'user_id': user_id,
                 'activity': activity,
+                'activity_class': activity_class,
                 'date': activity_date.strftime('%Y-%m-%d'),
                 'duration_minutes': duration,
                 'rating': rating
@@ -258,7 +282,8 @@ if __name__ == '__main__':
     print("="*60)
     
     # Generate user profiles (30% new users, 70% long-standing)
-    user_profiles = generate_user_profiles(n_users=1000, new_user_ratio=0.3)
+    # Using fixed seed=42 to lock the dataset
+    user_profiles = generate_user_profiles(n_users=1000, new_user_ratio=0.3, seed=42)
     
     # Create data directory if it doesn't exist
     os.makedirs('data', exist_ok=True)
@@ -271,7 +296,8 @@ if __name__ == '__main__':
     print(f"  - Long-standing members: {n_long} (robust metadata)")
     
     # Generate activity sequences (based on user profiles)
-    activity_sequences = generate_activity_sequences(user_profiles)
+    # Using fixed seed=42 to lock the dataset
+    activity_sequences = generate_activity_sequences(user_profiles, seed=42)
     activity_sequences.to_csv('data/activity_sequences.csv', index=False)
     
     n_activities_new = len(activity_sequences[activity_sequences['user_id'].isin(

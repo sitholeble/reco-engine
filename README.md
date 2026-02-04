@@ -285,14 +285,27 @@ print(f"Recommendations for new user: {recs}")
 
 ## Quick Start
 
-1. Generate fake data:
+
+1. Setup virtual environment and install dependencies:
 ```bash
-python data_generator.py
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-2. Run the demo:
+2. Generate fake data:
 ```bash
-python demo.py
+python3 data_generator.py
+```
+
+3. Run the demo:
+```bash
+python3 demo.py
+```
+
+Or use the automated setup:
+```bash
+./setup_and_test.sh
 ```
 
 ## Data Structure
