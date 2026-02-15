@@ -7,7 +7,9 @@ A comprehensive recommendation system for fitness activities with multiple model
 1. **Collaborative Filtering** - Amazon-style "people who did X also did Y"
 2. **Two Towers Model** - Deep learning model with separate towers for users and activities
 3. **LSTM Sequence Model** - Predicts next activity based on activity sequences
-4. **Feature Engineering** - Utilities for creating and transforming features
+4. **Hybrid Model** - Combines multiple approaches for better recommendations
+5. **Feature Engineering** - Utilities for creating and transforming features
+6. **A/B Testing Framework** - Evaluate different recommendation strategies and refine models based on user interactions
 
 ## Installation
 
@@ -475,6 +477,96 @@ user_features, feature_cols = fe.prepare_model_features(
 # Get minimal features for new users
 minimal_features = fe.get_minimal_features(user_profiles)
 ```
+
+## A/B Testing Framework
+
+Evaluate different recommendation strategies and refine models based on user interactions.
+
+### Quick Start
+
+```python
+from ab_testing_service import ABTestingService
+
+# Initialize service
+service = ABTestingService()
+
+# Create experiment
+experiment = service.framework.create_experiment(
+    experiment_id="exp_001",
+    name="Two Tower vs Hybrid",
+    description="Compare different recommendation strategies",
+    variants=['control', 'variant_a'],
+    traffic_split={'control': 0.5, 'variant_a': 0.5},
+    metrics=['click_through_rate', 'conversion_rate', 'engagement_score'],
+    duration_days=30
+)
+
+# Register strategies for each variant
+service.register_experiment_strategies("exp_001", {
+    'control': {
+        'strategy': 'two_tower',
+        'trainer': two_tower_trainer,
+        'activity_to_idx': activity_to_idx
+    },
+    'variant_a': {
+        'strategy': 'hybrid',
+        'two_tower_trainer': two_tower_trainer,
+        'sequence_trainer': sequence_trainer,
+        'activity_to_idx': activity_to_idx
+    }
+})
+
+# Get recommendations (automatically tracks impressions)
+recommendations, variant = service.get_recommendations(
+    user_id="user_123",
+    experiment_id="exp_001",
+    user_features={'age': 30, 'weight_kg': 70, 'height_cm': 170},
+    activity_history=['cycling', 'running'],
+    top_k=5
+)
+
+# Track user interactions
+service.track_click("user_123", "exp_001", variant, "spin_class")
+service.track_booking("user_123", "exp_001", variant, "spin_class", confirmed=True)
+
+# Analyze results
+results = service.get_experiment_results("exp_001")
+```
+
+### Available Strategies
+
+- **two_tower**: Two Tower model
+- **sequence_based**: LSTM/Sequence model  
+- **hybrid**: Combines multiple models
+- **collaborative_filtering**: Collaborative filtering
+- **popularity_based**: Baseline using popular activities
+- **diversity_focused**: Emphasizes diversity in recommendations
+
+### Running Tests
+
+```bash
+# Run A/B testing demonstration
+python test_ab_testing.py
+
+# Analyze experiment results
+python analyze_ab_results.py exp_001 --plot --export results.csv
+```
+
+### Key Features
+
+- **Consistent User Assignment**: Same user always gets same variant (using consistent hashing)
+- **Automatic Tracking**: Impressions tracked automatically when recommendations are generated
+- **Multiple Metrics**: CTR, conversion rate, booking rate, engagement score
+- **Easy Comparison**: Built-in comparison between variants with improvement percentages
+- **Persistent Storage**: All data saved to `data/ab_testing/` directory
+
+### Workflow
+
+1. **Create Experiment**: Define variants and traffic split
+2. **Register Strategies**: Map each variant to a recommendation strategy
+3. **Serve Recommendations**: Use `get_recommendations()` to serve recommendations (tracks impressions)
+4. **Track Interactions**: Call `track_click()` and `track_booking()` when users interact
+5. **Analyze Results**: Use `get_experiment_results()` to compare variant performance
 
 ## Off-the-Shelf Alternatives
 
